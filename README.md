@@ -4,39 +4,51 @@ Student Number: 223227110
 Repository: assignment-1-Nosipho2022 
 Date: March 2026
 ---
-Table of Contents
-System Requirements
-Architecture Explanation
-Environment Setup
-Installation Steps
-Evidence of Deployment
-NGINX Ingress Controller
-Storage Configuration
-Uninstalling K3s
-Troubleshooting
-Reflection
+## Table of Contents
+1. [System Requirements](#system-requirements)
+2. [Architecture Explanation](#architecture-explanation)
+3. [Environment Setup](#environment-setup)
+4. [Installation Steps](#installation-steps)
+5. [Evidence of Deployment](#evidence-of-deployment)
+6. [NGINX Ingress Controller](#nginx-ingress-controller)
+7. [Storage Configuration](#storage-configuration)
+8. [Uninstalling K3s](#uninstalling-k3s)
+9. [Troubleshooting](#troubleshooting)
+10. [Reflection](#reflection)
 ---
-System Requirements
-Component	Specification
-Cloud Provider	AWS (us-east-1 / N. Virginia)
-Instance Type	t3.large
-vCPUs	2 per node
-RAM	8 GB per node
-Storage	20 GiB gp3 per node
-OS	Ubuntu Server 22.04 LTS (64-bit x86)
-Nodes	3 × EC2 instances
-K3s Version	v1.34.5+k3s1
+## System Requirements
+
+| Component | Specification |
+|-----------|--------------|
+| Cloud Provider | AWS (us-east-1 / N. Virginia) |
+| Instance Type | t3.large |
+| vCPUs | 2 per node |
+| RAM | 8 GB per node |
+| Storage | 20 GiB gp3 per node |
+| OS | Ubuntu Server 22.04 LTS (64-bit x86) |
+| Nodes | 3 × EC2 instances |
+| K3s Version | v1.34.5+k3s1 |
 ---
-Architecture Explanation
-What is K3s?
-K3s is a lightweight, CNCF-certified Kubernetes distribution developed by Rancher Labs (now SUSE). It packages the entire Kubernetes control plane into a single binary under 100MB, making it ideal for edge computing, IoT, CI/CD pipelines, and resource-constrained environments. Unlike standard Kubernetes (kubeadm), K3s removes legacy and alpha features, replaces etcd with SQLite by default (or embedded etcd for HA), and bundles everything needed — container runtime, CNI, ingress controller, and storage provisioner — out of the box.
-Why K3s on AWS?
-Simplicity: Single binary install with one command
-HA Support: Embedded etcd enables multi-master HA without external dependencies
-Cost-effective: Runs on smaller instance types than full Kubernetes
-Production-ready: CNCF certified, suitable for 5G edge and cloud-native workloads
-Built-in components: Includes Traefik ingress, Flannel CNI, and local-path storage provisioner
-Cluster Architecture
+## Architecture Explanation
+
+### What is K3s?
+
+K3s is a lightweight, CNCF-certified Kubernetes distribution developed by 
+Rancher Labs (now SUSE). It packages the entire Kubernetes control plane into 
+a single binary under 100MB, making it ideal for edge computing, IoT, CI/CD 
+pipelines, and resource-constrained environments. Unlike standard Kubernetes 
+(kubeadm), K3s removes legacy and alpha features, replaces etcd with SQLite 
+by default (or embedded etcd for HA), and bundles everything needed — container 
+runtime, CNI, ingress controller, and storage provisioner — out of the box.
+
+### Why K3s on AWS?
+
+- **Simplicity:** Single binary install with one command
+- **HA Support:** Embedded etcd enables multi-master HA without external dependencies
+- **Cost-effective:** Runs on smaller instance types than full Kubernetes
+- **Production-ready:** CNCF certified, suitable for 5G edge and cloud-native workloads
+- **Built-in components:** Includes Traefik ingress, Flannel CNI, and local-path storage provisioner
+##Cluster Architecture
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        AWS VPC (172.31.0.0/16)              │
@@ -64,21 +76,36 @@ Cluster Architecture
 │  Security Group: k3s-ha-sg                                  │
 │  Ports: 22, 6443, 2379-2380, 8472/UDP, 10250, 30000-32767  │
 └─────────────────────────────────────────────────────────────┘
-```
-Key Components
-Component	Implementation	Purpose
-Control Plane	k3s-master-1, k3s-master-2	API server, scheduler, controller manager
-etcd	Embedded (per master)	Cluster state storage — HA with 2 members
-Worker/Agent	k3s-master-3	Runs application pods and workloads
-Container Runtime	containerd	Runs containers on each node
-CNI	Flannel (VXLAN)	Pod networking across nodes (port 8472/UDP)
-Ingress	NGINX Ingress Controller	HTTP/HTTPS routing into the cluster
-Storage	local-path-provisioner	Dynamic hostPath volume provisioning
-Storage (prod)	AWS EBS CSI Driver	Network-attached durable block storage
+## Key Components
+
+| Component | Implementation | Purpose |
+|-----------|---------------|---------|
+| Control Plane | `k3s-master-1`, `k3s-master-2` | Runs Kubernetes API server, scheduler, and controller manager |
+| etcd | Embedded (per master) | Stores cluster state and provides high availability with 2 members |
+| Worker / Agent | `k3s-master-3` | Runs application pods and workloads |
+| Container Runtime | `containerd` | Responsible for running containers on each node |
+| CNI | Flannel (VXLAN) | Provides pod networking across nodes (uses UDP port 8472) |
+| Ingress | NGINX Ingress Controller | Handles HTTP/HTTPS routing into the cluster |
+| Storage (Dev/Test) | local-path-provisioner | Provides dynamic hostPath-based volume provisioning |
+| Storage (Production) | AWS EBS CSI Driver | Provides durable, network-attached block storage |
+
 ---
-Environment Setup
-Step 1 — Create Key Pair (AWS Console)
-Navigate to: EC2 → Network & Security → Key Pairs → Create key pair
+
+## Environment Setup
+
+### Step 1 — Create an SSH Key Pair (AWS Console)
+
+1. Navigate to **EC2** in the AWS Console.
+2. Go to **Network & Security → Key Pairs**.
+3. Click **Create Key Pair**.
+4. Choose the following settings:
+   - **Key pair type:** RSA
+   - **Private key format:** `.pem`
+5. Download and securely store the key.
+
+This key will be used to **SSH into the EC2 instances** that host the Kubernetes nodes.
+
+---
 ```
 Name:              k3s-key
 Key pair type:     RSA
