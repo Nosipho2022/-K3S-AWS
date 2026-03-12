@@ -76,6 +76,7 @@ runtime, CNI, ingress controller, and storage provisioner — out of the box.
 │  Security Group: k3s-ha-sg                                  │
 │  Ports: 22, 6443, 2379-2380, 8472/UDP, 10250, 30000-32767  │
 └─────────────────────────────────────────────────────────────┘
+```
 ## Key Components
 
 | Component | Implementation | Purpose |
@@ -90,8 +91,7 @@ runtime, CNI, ingress controller, and storage provisioner — out of the box.
 | Storage (Production) | AWS EBS CSI Driver | Provides durable, network-attached block storage |
 
 ---
-
-## Environment Setup
+##Environment Setup
 
 ### Step 1 — Create an SSH Key Pair (AWS Console)
 
@@ -223,7 +223,7 @@ sudo kubectl get svc nginx
 # Access at http://<PUBLIC_IP>:<NODEPORT>
 ```
 ---
-Evidence of Deployment
+##Evidence of Deployment
 > **Screenshots below show the actual deployment. Terminal prompts display the node hostname confirming originality.**
 1. kubectl get nodes — All 3 Nodes Ready
 ![kubectl get nodes](screenshots/kubectl-get-nodes.png)
@@ -272,7 +272,7 @@ sudo kubectl -n ingress-nginx get pods
 sudo kubectl -n ingress-nginx get svc
 ```
 ---
-Storage Configuration
+##Storage Configuration
 8.1 — Default Storage (local-path-provisioner)
 K3s ships with `local-path-provisioner` built-in. Test it:
 ```bash
@@ -349,7 +349,8 @@ sudo systemctl status k3s
 # Expected: Unit k3s.service could not be found.
 ```
 ---
-Troubleshooting
+##Troubleshooting
+
 Check K3s service logs
 ```bash
 journalctl -u k3s -f
@@ -385,20 +386,77 @@ aws ec2 modify-instance-metadata-options \
   --region us-east-1
 ```
 ---
-Reflection
-What did I learn?
-Deploying K3s on AWS taught me the practical difference between theoretical Kubernetes knowledge and real-world implementation. Before this assignment, I understood Kubernetes conceptually — control planes, pods, and services — but had never provisioned a multi-node cluster from scratch. Working through each step, from creating security groups to joining nodes with tokens, gave me hands-on understanding of how these components interact at a network level.
-I learned that infrastructure configuration is as important as the software itself. Incorrectly configured security group rules — such as missing the Flannel VXLAN port 8472/UDP — can prevent nodes from communicating entirely. I also learned the importance of using self-referencing security group rules for inter-node traffic, which restricts cluster communication to only the nodes within the group rather than exposing internal ports to the internet.
-Working with EC2 Instance Connect instead of SSH keys taught me that cloud-native tools can simplify workflows significantly. Rather than managing key files, I could connect directly from the browser, which is especially useful in learning environments like AWS Learner Labs.
-Challenges Faced and How I Resolved Them
-The most significant challenge was the token CA hash mismatch when joining master-2 to the cluster. The error message — "token CA hash does not match the Cluster CA certificate hash" — was initially confusing. After checking the logs with `journalctl -xeu k3s.service`, I realized the token had been incorrectly typed (two characters transposed). The fix was to uninstall K3s on master-2, carefully re-copy the exact token from master-1 using `cat | tr -d '\n'` to strip newlines, and reinstall.
-Another challenge was attempting to use a `.ppk` key format in AWS CloudShell, which only accepts `.pem` format. This required creating a new key pair and understanding the difference between PuTTY format (.ppk) and OpenSSH format (.pem).
-I also encountered a failure when trying to create the security group inline during instance launch — AWS cannot self-reference a security group that does not yet exist. The solution was to create the security group separately first, then select it as an existing group during instance launch.
-K3s and Production Kubernetes / 5G Cloud-Native Concepts
-K3s is increasingly relevant in 5G and cloud-native telecommunications architectures. In 5G network deployments, Multi-access Edge Computing (MEC) requires Kubernetes clusters to run at the network edge — in base stations, small cells, and edge data centers — where resources are constrained and low latency is critical. K3s's small footprint (single binary, <512MB RAM) makes it ideal for these environments compared to full Kubernetes distributions.
-Cloud-native 5G network functions such as AMF (Access and Mobility Management), SMF (Session Management), and UPF (User Plane Function) are containerized and orchestrated by Kubernetes. K3s provides the same Kubernetes API, enabling these network functions to be deployed at the edge with the same tooling used in core data centers. The embedded etcd HA configuration we deployed mirrors the resilience requirements of production 5G core networks, where control plane availability is critical.
+## Reflection
+
+### What Did I Learn?
+
+Deploying K3s on AWS helped me understand the practical difference between theoretical Kubernetes knowledge and real-world implementation. Prior to this assignment, I understood Kubernetes concepts such as control planes, pods, and services at a conceptual level, but I had never provisioned a multi-node cluster from scratch.
+
+Working through each stage of the deployment—from configuring security groups to joining nodes using cluster tokens—provided hands-on insight into how Kubernetes components interact at the infrastructure and network levels. I learned that infrastructure configuration is just as important as the software itself. For example, incorrectly configured security group rules, such as failing to allow the Flannel VXLAN port (8472/UDP), can prevent cluster nodes from communicating with each other entirely.
+
+I also learned the importance of using self-referencing security group rules for inter-node communication. This approach restricts internal cluster traffic to nodes within the same security group rather than exposing internal ports to the public internet, thereby improving security.
+
+Additionally, using EC2 Instance Connect instead of traditional SSH keys demonstrated how cloud-native tools can simplify operational workflows. Instead of managing private key files locally, I was able to connect directly to instances through the browser, which is particularly convenient in controlled environments such as AWS Learner Labs.
+
+---
+
+### Challenges Faced and How I Resolved Them
+
+One of the most significant challenges I encountered was a token CA hash mismatch when attempting to join the second master node to the cluster. The error message—“token CA hash does not match the Cluster CA certificate hash”—was initially difficult to interpret.
+
+After examining the service logs using:
+
+```bash
+journalctl -xeu k3s.service
+I discovered that the cluster token had been typed incorrectly, with two characters transposed. To resolve this issue, I uninstalled K3s on the affected node, carefully copied the correct token from the primary master node using:
+
+cat /var/lib/rancher/k3s/server/node-token | tr -d '\n'
+I then reinstalled K3s using the corrected token.
+
+Another issue occurred when attempting to use a .ppk SSH key format in AWS CloudShell, which only supports .pem keys. This required creating a new key pair and understanding the difference between PuTTY key format (.ppk) and OpenSSH format (.pem).
+
+I also encountered a deployment problem when trying to create the security group during EC2 instance launch. AWS does not allow a security group to reference itself if it does not yet exist. The solution was to create the security group first and then select it during instance creation.
+
+K3s and Production Kubernetes in 5G Cloud-Native Architectures
+K3s is highly relevant in modern 5G and cloud-native telecommunications environments. In 5G deployments, Multi-access Edge Computing (MEC) requires Kubernetes clusters to run at the network edge, such as in base stations, small cells, or edge data centers. These environments typically have limited resources and require extremely low latency.
+
+K3s has a very small footprint—running as a single binary and requiring less than 512MB of RAM—which makes it well suited for edge computing environments compared to full Kubernetes distributions.
+
+Cloud-native 5G network functions such as:
+
+AMF (Access and Mobility Management Function)
+
+SMF (Session Management Function)
+
+UPF (User Plane Function)
+
+are increasingly containerized and orchestrated using Kubernetes platforms. Because K3s maintains compatibility with the standard Kubernetes API, these network functions can be deployed at the edge using the same tooling used in centralized cloud data centers.
+
+The embedded high-availability etcd configuration implemented in this deployment also reflects the resilience requirements of real-world 5G networks, where control plane availability is critical.
+
 Virtualization and Containerization for Scalable Services
-This assignment demonstrated how virtualization and containerization work together to enable scalable services. EC2 instances are virtual machines running on AWS's physical hardware — each node is a lightweight OS instance isolated from others. Containerization, via containerd and Kubernetes, adds another layer of abstraction: applications run in containers that share the OS kernel but are isolated in terms of filesystem, network, and process space.
-This two-layer approach enables horizontal scaling — adding worker nodes to the cluster scales compute capacity without reconfiguring applications. Kubernetes handles scheduling, load balancing, and self-healing automatically. For 5G and cloud-native services, this means network functions can scale dynamically based on traffic load, ensuring quality of service without manual intervention.
+This assignment demonstrated how virtualization and containerization work together to support scalable cloud services.
+
+Amazon EC2 instances function as virtual machines running on AWS physical infrastructure. Each node in the cluster operates as a separate virtualized operating system environment.
+
+Containerization, managed through containerd and Kubernetes, adds another layer of abstraction. Applications run inside containers that share the host operating system kernel while remaining isolated in terms of filesystem, networking, and process space.
+
+This layered architecture enables horizontal scaling. Additional worker nodes can be added to the cluster to increase computing capacity without modifying deployed applications. Kubernetes automatically manages workload scheduling, load balancing, and self-healing.
+
+For cloud-native services such as those used in 5G networks, this capability allows network functions to scale dynamically based on traffic demand while maintaining consistent quality of service.
+
+Future Improvements
+To further enhance this project, the following improvements could be implemented:
+
+Deploy the infrastructure using Infrastructure as Code (Terraform).
+
+Implement monitoring and observability using Prometheus and Grafana.
+
+Configure automated backups for etcd to improve disaster recovery.
+
+Implement Kubernetes RBAC policies for improved cluster security.
+
+Deploy applications using Helm charts or GitOps workflows.
+
 ---
 Repository: assignment-1-Nosipho2022 | Student: 223227110
